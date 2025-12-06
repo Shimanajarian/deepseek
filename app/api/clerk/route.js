@@ -1,5 +1,5 @@
 import { Webhook } from "svix";
-import{ connectDB }from "@/config/db";
+import connectToDB from "@/config/db";
 import User from "@/models/User";
 import { headers } from "next/headers";
 import { NextRequest } from "next/server";
@@ -26,7 +26,7 @@ const userData={
     image:data.image_url,
 };
 
-await connectDB();
+await connectToDB();
 
 switch(type){
     case 'user.created':

@@ -20,3 +20,4 @@ console.error('Error connecting to mongoDB:',error)
 return cached.conn;
 
 }
+export default connectToDB
