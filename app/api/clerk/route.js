@@ -1,54 +1,61 @@
 import { Webhook } from "svix";
-import connectToDB from "@/config/db";
+import { connectToDB } from "@/config/db";
 import User from "@/models/User";
 import { headers } from "next/headers";
-import { NextRequest } from "next/server";
-
+import { NextResponse } from "next/server";
 
 export async function POST(req) {
-    const wh=new Webhook(process.env.SIGNIN_SECRET);
-const headerPayload=await headers()
-const svixHeaders={
-    'svix-id':headerPayload.get('svix-id'),
-    'svix-timestamp':headerPayload.get('svix-timestamp'),
-'svix-signature':headerPayload.get('svix-signature')
-}
-// get the payload and verify it
+  try {
+    // Initialize webhook using Clerk Webhook Secret
+    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
-const payload= await req.json();
-const body=JSON.stringify(payload);
-const {data,type}=wh.verify(body,svixHeaders);
+    // Get headers from Clerk request
+    const headerPayload = headers();
+    const svixHeaders = {
+      "svix-id": headerPayload.get("svix-id"),
+      "svix-timestamp": headerPayload.get("svix-timestamp"),
+      "svix-signature": headerPayload.get("svix-signature"),
+    };
 
-// prepare the user data to bo seved in the database
-const userData={
-    _id:data.id,
-    email:data.email_addresses[0].email_address,
-    name :`${data.first_name} ${data.last_name}`,
-    image:data.image_url,
-};
+    // Parse & verify body
+    const payload = await req.json();
+    const body = JSON.stringify(payload);
+    const { data, type } = wh.verify(body, svixHeaders);
 
-await connectToDB();
+    // Connect DB
+    await connectToDB();
 
-switch(type){
-    case 'user.created':
+    // User data structure
+    const userData = {
+      _id: data.id,
+      email: data.email_addresses?.[0]?.email_address,
+      name: `${data.first_name || ""} ${data.last_name || ""}`.trim(),
+      image: data.image_url,
+    };
+
+    // Handle Clerk events
+    switch (type) {
+      case "user.created":
         await User.create(userData);
         break;
-    case 'user.updated':
-        await User.findByIdAndUpdate(data.id,userData);
-        break;  
-        case 'user.deleted':
-            await User.findByIdAndDelete(data.id)
-            break;
-    default:
+
+      case "user.updated":
+        await User.findByIdAndUpdate(data.id, userData);
         break;
 
+      case "user.deleted":
+        await User.findByIdAndDelete(data.id);
+        break;
 
+      default:
+        break;
+    }
+
+    return NextResponse.json({ message: "Event received" });
+  } catch (err) {
+    console.error("Webhook Error:", err);
+    return NextResponse.json({ error: "Webhook error", details: err.message }, { status: 400 });
+  }
 }
-
-
-return NextRequest.json({message:'Event received'});
-
-
-};
 
 
